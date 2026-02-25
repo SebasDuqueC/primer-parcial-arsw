@@ -1,5 +1,8 @@
 package edu.eci.arsw.math;
 
+import edu.eci.arsw.threads.PiDigitsThread;
+import java.util.ArrayList;
+
 ///  <summary>
 ///  An implementation of the Bailey-Borwein-Plouffe formula for calculating hexadecimal
 ///  digits of pi.
@@ -11,9 +14,11 @@ public class PiDigits {
     private static int DigitsPerSum = 8;
     private static double Epsilon = 1e-17;
 
+    private static final Object lock = new Object();
+
     
     /**
-     * Returns a range of hexadecimal digits of pi.
+     * Returns a range of hexadecimal digits of pi (sequential).
      * @param start The starting location of the range.
      * @param count The number of digits to return
      * @return An array containing the hexadecimal digits.
@@ -31,6 +36,8 @@ public class PiDigits {
         double sum = 0;
 
         for (int i = 0; i < count; i++) {
+        
+
             if (i % DigitsPerSum == 0) {
                 sum = 4 * sum(1, start)
                         - 2 * sum(4, start)
@@ -42,6 +49,44 @@ public class PiDigits {
 
             sum = 16 * (sum - Math.floor(sum));
             digits[i] = (byte) sum;
+        }
+
+        return digits;
+    }
+
+
+    public static byte[] getDigits(int start, int count, int N) {
+        
+        ArrayList<PiDigitsThread> threads = new ArrayList<>();
+        int remainder = count % N;
+        boolean fin = false;
+        int digitsPerThread = count / N;
+        int currentStart = start;
+        
+        for (int i = 0; i < N; i++) {
+            int threadCount = digitsPerThread;
+            //System.out.print(threadCount);
+            if (i < remainder) {
+                threadCount = threadCount + 1;
+            }
+            PiDigitsThread thread = new PiDigitsThread(currentStart, threadCount);
+            thread.start();
+            threads.add(thread);
+            currentStart += threadCount;
+        }
+        
+        byte[] digits = new byte[count];
+        int offset = 0;
+        for (int i = 0; i < N; i++) {
+            try {
+                threads.get(i).join();
+            } catch (InterruptedException e) {
+                //
+            }
+            PiDigitsThread res = threads.get(i);
+            byte[] partial = res.getResult();
+            System.arraycopy(partial, 0, digits, offset, partial.length);
+            offset += partial.length;
         }
 
         return digits;
