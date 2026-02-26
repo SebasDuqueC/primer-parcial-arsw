@@ -2,6 +2,7 @@ package edu.eci.arsw.math;
 
 import edu.eci.arsw.threads.PiDigitsThread;
 import java.util.ArrayList;
+import java.util.Scanner;
 
 ///  <summary>
 ///  An implementation of the Bailey-Borwein-Plouffe formula for calculating hexadecimal
@@ -15,6 +16,20 @@ public class PiDigits {
     private static double Epsilon = 1e-17;
 
     private static final Object lock = new Object();
+    private static boolean pausa = false;
+
+    public static void pausar() {
+        pausa = true;
+    }
+
+    public static void reanudar() {
+        pausa = false;
+        synchronized (lock) {
+
+            lock.notifyAll();
+        }
+
+    }
 
     
     /**
@@ -36,7 +51,20 @@ public class PiDigits {
         double sum = 0;
 
         for (int i = 0; i < count; i++) {
-        
+            
+            synchronized (lock) {
+                if (pausa) {
+                    System.out.println(i + "digitos");
+                    while (pausa) {
+                        try {
+                            lock.wait();
+                        } catch (InterruptedException e) {
+                            //
+                        }
+                    }
+                }
+            }
+
 
             if (i % DigitsPerSum == 0) {
                 sum = 4 * sum(1, start)
@@ -73,8 +101,35 @@ public class PiDigits {
             thread.start();
             threads.add(thread);
             currentStart += threadCount;
+            
+
         }
-        
+
+        while (!fin) {
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                //
+            }
+            fin = true;
+            for (PiDigitsThread thread : threads) {
+                if (thread.isAlive()) {
+                    fin = false;
+                    break;
+                }
+            }
+            if (!fin) {
+                PiDigits.pausar();
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException e) {}
+                System.out.println("ENTER");
+                Scanner scanner = new Scanner(System.in);
+                scanner.nextLine();
+                PiDigits.reanudar();
+            }
+        }
+
         byte[] digits = new byte[count];
         int offset = 0;
         for (int i = 0; i < N; i++) {
